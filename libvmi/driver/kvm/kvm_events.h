@@ -60,4 +60,14 @@ kvm_set_mem_access(
     vmi_mem_access_t page_access_flag,
     uint16_t vmm_pagetable_id);
 
+status_t
+kvm_start_single_step(
+    vmi_instance_t vmi,
+    single_step_event_t *event);
+
+status_t
+kvm_stop_single_step(
+        vmi_instance_t vmi,
+        uint32_t vcpu);
+
 #endif // KVM_EVENTS_H
