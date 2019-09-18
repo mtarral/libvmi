@@ -53,13 +53,15 @@ event_response_t single_step_callback(vmi_instance_t vmi, vmi_event_t *event)
 int main (int argc, char **argv)
 {
     vmi_instance_t vmi;
+    vmi_init_data_t init_data = {0};
+    vmi_mode_t mode;
 
     struct sigaction act;
 
     char *name = NULL;
 
     if (argc < 2) {
-        fprintf(stderr, "Usage: single_step_example <name of VM> \n");
+        fprintf(stderr, "Usage: single_step_example <name of VM> [kvmi socket path]\n");
         exit(1);
     }
 
@@ -75,9 +77,24 @@ int main (int argc, char **argv)
     sigaction(SIGINT,  &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
+    if (argc == 3) {
+        char *kvmi_socket = argv[2];
+
+        // fill init_data
+        init_data.count = 1;
+        init_data.entry[0].type = VMI_INIT_DATA_KVMI_SOCKET;
+        init_data.entry[0].data = kvmi_socket;
+    }
+
+    if (VMI_FAILURE == vmi_get_access_mode(NULL, (void*)name, VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS, &init_data, &mode)) {
+        fprintf(stderr, "Failed to get access mode\n");
+        return 1;
+    }
+
     /* initialize the libvmi library */
-    if (VMI_FAILURE == vmi_init(&vmi, VMI_XEN, (void*)name, VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS, NULL, NULL)) {
-        printf("Failed to init LibVMI library.\n");
+    if (VMI_FAILURE ==
+        vmi_init(&vmi, mode, name, VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS, &init_data, NULL)) {
+        fprintf(stderr, "Failed to init LibVMI library.\n");
         return 1;
     }
 
