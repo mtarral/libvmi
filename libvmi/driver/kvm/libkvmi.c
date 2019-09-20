@@ -37,6 +37,7 @@
 #include <linux/kvm_para.h>
 #include <sys/stat.h>
 #include <stdarg.h>
+#include <linux/kvmi.h>
 
 #define MIN( X, Y ) ( ( X ) < ( Y ) ? ( X ) : ( Y ) )
 
@@ -2043,4 +2044,14 @@ int kvmi_get_maximum_gfn( void *dom, unsigned long long *gfn )
 		*gfn = rpl.gfn;
 
 	return err;
+}
+
+int kvmi_toogle_singlestep( void *dom, unsigned short vcpu, bool enable )
+{
+	struct {
+		struct kvmi_vcpu_hdr       vcpu;
+		struct kvmi_set_singlestep cmd;
+	} req = { .vcpu = { .vcpu = vcpu }, .cmd = { .enable = enable ? 1 : 0 } };
+
+	return request( dom, KVMI_SET_SINGLESTEP, &req, sizeof( req ), NULL, NULL );
 }

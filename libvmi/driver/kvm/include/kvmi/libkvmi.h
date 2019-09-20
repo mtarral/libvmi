@@ -42,6 +42,7 @@ struct kvmi_dom_event {
 			struct kvmi_event_pf         page_fault;
 			struct kvmi_event_trap       trap;
 			struct kvmi_event_descriptor desc;
+			struct kvmi_event_singlestep singlestep;
 		};
 	} event;
 	unsigned char buf[KVMI_MSG_SIZE];
@@ -123,6 +124,7 @@ int     kvmi_queue_reply_event( void *batch, unsigned int msg_seq, const void *d
 int     kvmi_queue_page_access( void *batch, unsigned long long int *gpa, unsigned char *access, unsigned short count );
 int     kvmi_queue_pause_vcpu( void *batch, unsigned short vcpu );
 int     kvmi_get_maximum_gfn( void *dom, unsigned long long *gfn );
+int     kvmi_toogle_singlestep( void *dom, unsigned short vcpu, bool enable );
 
 #ifdef __cplusplus
 }
