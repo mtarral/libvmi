@@ -33,10 +33,17 @@
 
 vmi_event_t single_event;
 
+// store vmi instance globally to use it in atexit routine
+static vmi_instance_t vmi = {0};
 static int interrupted = 0;
 static void close_handler(int sig)
 {
     interrupted = sig;
+}
+
+void exit_cleanup()
+{
+    vmi_destroy(vmi);
 }
 
 event_response_t single_step_callback(vmi_instance_t vmi, vmi_event_t *event)
@@ -52,13 +59,15 @@ event_response_t single_step_callback(vmi_instance_t vmi, vmi_event_t *event)
 
 int main (int argc, char **argv)
 {
-    vmi_instance_t vmi;
-    vmi_init_data_t init_data = {0};
+    vmi_init_data_t *init_data = alloca(sizeof(vmi_init_data_t)
+                                       + (sizeof(vmi_init_data_entry_t) * 1));
     vmi_mode_t mode;
 
     struct sigaction act;
 
     char *name = NULL;
+    char *kvmi_socket;
+
 
     if (argc < 2) {
         fprintf(stderr, "Usage: single_step_example <name of VM> [kvmi socket path]\n");
@@ -77,28 +86,31 @@ int main (int argc, char **argv)
     sigaction(SIGINT,  &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
+
     if (argc == 3) {
-        char *kvmi_socket = argv[2];
+        kvmi_socket = argv[2];
 
         // fill init_data
-        init_data.count = 1;
-        init_data.entry[0].type = VMI_INIT_DATA_KVMI_SOCKET;
-        init_data.entry[0].data = kvmi_socket;
+        init_data->count = 1;
+        init_data->entry[0].type = VMI_INIT_DATA_KVMI_SOCKET;
+        init_data->entry[0].data = kvmi_socket;
     }
 
-    if (VMI_FAILURE == vmi_get_access_mode(NULL, (void*)name, VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS, &init_data, &mode)) {
+    if (VMI_FAILURE == vmi_get_access_mode(NULL, (void*)name, VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS, init_data, &mode)) {
         fprintf(stderr, "Failed to get access mode\n");
         return 1;
     }
 
     /* initialize the libvmi library */
     if (VMI_FAILURE ==
-        vmi_init(&vmi, mode, name, VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS, &init_data, NULL)) {
+        vmi_init(&vmi, mode, name, VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS, init_data, NULL)) {
         fprintf(stderr, "Failed to init LibVMI library.\n");
         return 1;
     }
 
     printf("LibVMI init succeeded!\n");
+    // register cleanup routine
+    atexit(&exit_cleanup);
 
     //Single step setup
     memset(&single_event, 0, sizeof(vmi_event_t));
@@ -107,15 +119,24 @@ int main (int argc, char **argv)
     single_event.callback = single_step_callback;
     single_event.ss_event.enable = 1;
     SET_VCPU_SINGLESTEP(single_event.ss_event, 0);
-    vmi_register_event(vmi, &single_event);
+
+    if (VMI_FAILURE == vmi_register_event(vmi, &single_event)) {
+        fprintf(stderr, "Failed to register event\n");
+        return 1;
+    }
     while (!interrupted ) {
         printf("Waiting for events...\n");
-        vmi_events_listen(vmi,500);
+        if (VMI_FAILURE == vmi_events_listen(vmi,500)) {
+            fprintf(stderr, "Failed to listen on events\n");
+            return 1;
+        }
     }
     printf("Finished with test.\n");
+    if (VMI_FAILURE == vmi_clear_event(vmi, &single_event, NULL)) {
+        fprintf(stderr, "Failed to clear event\n");
+        return 1;
+    }
 
-    // cleanup any memory associated with the libvmi instance
-    vmi_destroy(vmi);
-
+    // vmi_destroy called in cleanup routine
     return 0;
 }
