@@ -34,6 +34,28 @@
 /*
  * Helpers
  */
+status_t
+kvm_start_single_step_vcpu(
+        kvm_instance_t *kvm,
+        unsigned int vcpu)
+{
+    dbprint(VMI_DEBUG_KVM, "--%s on %u\n", __func__, vcpu);
+    if (kvmi_control_events(kvm->kvmi_dom, vcpu, KVMI_EVENT_SINGLESTEP, true)) {
+        errprint("%s: kvmi_control_events failed: %s\n", __func__, strerror(errno));
+        return VMI_FAILURE;
+    }
+
+    if (kvmi_toogle_singlestep(kvm->kvmi_dom, vcpu, true)) {
+        errprint("%s: kvmi_toogle_singlestep failed: %s\n", __func__, strerror(errno));
+        if (kvmi_control_events(kvm->kvmi_dom, vcpu, KVMI_EVENT_SINGLESTEP, false))
+            errprint("%s: kvmi_control_events failed: %s\n", __func__, strerror(errno));
+        return VMI_FAILURE;
+    }
+
+    kvm->vcpu_sstep[vcpu] = true;
+    return VMI_SUCCESS;
+}
+
 static void
 fill_ev_common_kvmi_to_libvmi(
         struct kvmi_dom_event *kvmi_event,
@@ -102,6 +124,7 @@ process_cb_response(
         size_t rpl_size)
 {
     kvm_instance_t *kvm = kvm_get_instance(vmi);
+    status_t status = VMI_SUCCESS;
 #ifdef ENABLE_SAFETY_CHECKS
     if (!kvm || !kvm->kvmi_dom) {
         errprint("%s: invalid kvm or kvmi handles\n", __func__);
@@ -112,11 +135,21 @@ process_cb_response(
         return VMI_FAILURE;
     }
 #endif
+    unsigned int vcpu = kvmi_event->event.common.vcpu;
+
     // loop over all possible responses
     for (uint32_t i = VMI_EVENT_RESPONSE_NONE+1; i <=__VMI_EVENT_RESPONSE_MAX; i++) {
         event_response_t candidate = 1u << i;
         if (response & candidate) {
             switch (candidate) {
+                case VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP:
+                    dbprint(VMI_DEBUG_KVM, "--process TOGGLE_SINGLESTEP %d\n", kvm->vcpu_sstep[vcpu]);
+                    if (kvm->vcpu_sstep[vcpu]) {
+                        status = kvm_stop_single_step(vmi, vcpu);
+                    } else {
+                        status = kvm_start_single_step_vcpu(kvm, vcpu);
+                    }
+                    break;
                 default:
                     errprint("%s: KVM - unhandled event reponse %u\n", __func__, candidate);
                     break;
@@ -127,7 +160,7 @@ process_cb_response(
     if (kvmi_reply_event(kvm->kvmi_dom, kvmi_event->seq, rpl, rpl_size))
         return VMI_FAILURE;
 
-    return VMI_SUCCESS;
+    return status;
 }
 
 static event_response_t
@@ -951,8 +984,7 @@ kvm_start_single_step(
                 }
 
                 // toggle singlestepping
-                if (kvmi_toogle_singlestep(kvm->kvmi_dom, vcpu, true)) {
-                    errprint("%s: kvmi_toogle_singlestep failed: %s\n", __func__, strerror(errno));
+                if (VMI_FAILURE == kvm_start_single_step_vcpu(kvm, vcpu)) {
                     goto rewind;
                 }
             }
@@ -986,7 +1018,7 @@ kvm_stop_single_step(
         return VMI_FAILURE;
     }
 #endif
-
+    dbprint(VMI_DEBUG_KVM, "--%s on %u\n", __func__, vcpu);
     dbprint(VMI_DEBUG_KVM, "--Disable MTF flag on vcpu %" PRIu32 "\n", vcpu);
     if (kvmi_control_events(kvm->kvmi_dom, vcpu, KVMI_EVENT_SINGLESTEP, false)) {
         errprint("%s: kvmi_control_events failed: %s\n", __func__, strerror(errno));
@@ -997,6 +1029,8 @@ kvm_stop_single_step(
         errprint("%s: kvmi_toogle_singlestep failed: %s\n", __func__, strerror(errno));
         return VMI_FAILURE;
     }
+
+    kvm->vcpu_sstep[vcpu] = false;
 
     return VMI_SUCCESS;
 }

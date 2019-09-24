@@ -51,6 +51,7 @@ typedef struct kvm_instance {
     // store KVMI_EVENT_PAUSE_VCPU events poped by vmi_events_listen(vmi, 0)
     // to be used by vmi_resume_vm()
     struct kvmi_dom_event** pause_events_list;
+    bool vcpu_sstep[16]; // whether singlestepping is enabled on a given vcpu
     // dispatcher to handle VM events in each process_xxx functions
     status_t (*process_event[KVMI_NUM_EVENTS])(vmi_instance_t vmi, struct kvmi_dom_event *event);
 } kvm_instance_t;

@@ -28,6 +28,8 @@
 
 #include "private.h"
 
+
+// driver API
 status_t
 kvm_events_init(
     vmi_instance_t vmi,
