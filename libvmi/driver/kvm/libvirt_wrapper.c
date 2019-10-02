@@ -68,5 +68,12 @@ status_t create_libvirt_wrapper(kvm_instance_t *kvm)
     wrapper->virDomainResume = dlsym(wrapper->handle, "virDomainResume");
     wrapper->virConnectAuthPtrDefault = dlsym(wrapper->handle, "virConnectAuthPtrDefault");
 
-    return sanity_check(kvm);
+    if (VMI_FAILURE == sanity_check(kvm)) {
+        if (dlclose(wrapper->handle)) {
+            dbprint(VMI_DEBUG_KVM, "--failed to close a handle to libvirt\n");
+        }
+        return VMI_FAILURE;
+    }
+
+    return VMI_SUCCESS;
 }
