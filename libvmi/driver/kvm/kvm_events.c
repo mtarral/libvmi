@@ -548,6 +548,8 @@ kvm_events_listen(
 #endif
     struct kvmi_dom_event *event = NULL;
     unsigned int ev_reason = 0;
+    // if timeout is 0, we have to process all leftover events on the ring
+    bool process_all_events = (timeout == 0) ? true : false;
 
     kvm_instance_t *kvm = kvm_get_instance(vmi);
 #ifdef ENABLE_SAFETY_CHECKS
@@ -555,38 +557,40 @@ kvm_events_listen(
         return VMI_FAILURE;
 #endif
 
-    // wait next event
-    if (kvmi_wait_event(kvm->kvmi_dom, (kvmi_timeout_t)timeout)) {
-        if (errno == ETIMEDOUT) {
-            // no events !
-            return VMI_SUCCESS;
+    do {
+        // wait next event
+        if (kvmi_wait_event(kvm->kvmi_dom, (kvmi_timeout_t)timeout)) {
+            if (errno == ETIMEDOUT) {
+                // no events !
+                break;
+            }
+            errprint("%s: kvmi_wait_event failed: %s\n", __func__, strerror(errno));
+            return VMI_FAILURE;
         }
-        errprint("%s: kvmi_wait_event failed: %s\n", __func__, strerror(errno));
-        return VMI_FAILURE;
-    }
 
-    // pop event from queue
-    if (kvmi_pop_event(kvm->kvmi_dom, &event)) {
-        errprint("%s: kvmi_pop_event failed: %s\n", __func__, strerror(errno));
-        return VMI_FAILURE;
-    }
+        // pop event from queue
+        if (kvmi_pop_event(kvm->kvmi_dom, &event)) {
+            errprint("%s: kvmi_pop_event failed: %s\n", __func__, strerror(errno));
+            return VMI_FAILURE;
+        }
 
-    // handle event
-    ev_reason = event->event.common.event;
+        // handle event
+        ev_reason = event->event.common.event;
 #ifdef ENABLE_SAFETY_CHECKS
-    if ( ev_reason >= KVMI_NUM_EVENTS || !kvm->process_event[ev_reason] ) {
-        errprint("Undefined handler for %u event reason\n", ev_reason);
-        goto error_exit;
-    }
+        if ( ev_reason >= KVMI_NUM_EVENTS || !kvm->process_event[ev_reason] ) {
+            errprint("Undefined handler for %u event reason\n", ev_reason);
+            goto error_exit;
+        }
 #endif
-    // call handler
-    if (VMI_FAILURE == kvm->process_event[ev_reason](vmi, event))
-        goto error_exit;
+        // call handler
+        if (VMI_FAILURE == kvm->process_event[ev_reason](vmi, event))
+            goto error_exit;
 
-    if (event) {
-        free(event);
-        event = NULL;
-    }
+        if (event) {
+            free(event);
+            event = NULL;
+        }
+    } while (process_all_events);
 
     return VMI_SUCCESS;
 error_exit:
