@@ -23,6 +23,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with LibVMI.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <assert.h>
 
 #include "private.h"
 #include "msr-index.h"
@@ -576,6 +577,19 @@ kvm_events_listen(
 
         // handle event
         ev_reason = event->event.common.event;
+
+        // special case to handle PAUSE events
+        // since they have to managed by vmi_resume_vm(), we simply store them
+        // in the kvm_instance for later use by this function
+        if (KVMI_EVENT_PAUSE_VCPU == ev_reason) {
+            uint16_t vcpu = event->event.common.vcpu;
+#ifdef ENABLE_SAFETY_CHECKS
+            assert(vcpu < vmi->num_vcpus);
+#endif
+            kvm->pause_events_list[event->event.common.vcpu] = event;
+            event = NULL;
+            continue;
+        }
 #ifdef ENABLE_SAFETY_CHECKS
         if ( ev_reason >= KVMI_NUM_EVENTS || !kvm->process_event[ev_reason] ) {
             errprint("Undefined handler for %u event reason\n", ev_reason);
