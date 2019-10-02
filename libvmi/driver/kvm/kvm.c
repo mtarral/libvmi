@@ -439,6 +439,7 @@ kvm_destroy(
     }
 
     dlclose(kvm->libvirt.handle);
+    g_free(kvm);
 }
 
 uint64_t
