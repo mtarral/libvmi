@@ -5,6 +5,12 @@ env:
     global:
         - secure: "$COVERITY_SCAN_TOKEN"
 
+before_script:
+  - git clone https://github.com/KVM-VMI/kvm --branch kvmi --depth 1
+  - cd kvm/tools/kvm/kvmi
+  - make
+  - sudo make install
+
 matrix:
     include:
 
