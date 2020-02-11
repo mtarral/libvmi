@@ -1,3 +1,9 @@
+find_package(Xen REQUIRED)
+set_property(GLOBAL APPEND PROPERTY G_VMI_PUBLIC_HEADERS events.h)
+# CMAKE_DL_LIBS -> dlopen* lib
+target_link_libraries(vmi_shared PRIVATE ${CMAKE_DL_LIBS})
+set_property(GLOBAL APPEND PROPERTY G_VMI_PUBLIC_DEPS ${CMAKE_DL_LIBS})
+
 target_sources(vmi_shared PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/altp2m.c
     ${CMAKE_CURRENT_SOURCE_DIR}/altp2m_private.h
