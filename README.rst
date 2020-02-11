@@ -45,7 +45,7 @@ Dependencies
 ------------
 The following libraries are used in building this code:
 
-- ``CMake`` (``>= 3.1``)
+- ``CMake`` (``>= 3.13``)
 
 - ``libtool`` Generic library support script
 
