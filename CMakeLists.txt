@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
 
+# allow to link libraries with targets not built in the same directory
+cmake_policy(SET CMP0079 NEW)
+
 # set cmake module path, to search in cmake/modules first
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 #-----------------------------------------------------------------------------
