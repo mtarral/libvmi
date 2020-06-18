@@ -128,62 +128,6 @@ int main (int argc, char **argv)
             goto error_exit;
         }
     }
-
-    // toggling singlestep off/on
-
-    // pause before cleaning the ring
-    // this prevents new events from being queued
-    if (VMI_FAILURE == vmi_pause_vm(vmi)) {
-        fprintf(stderr, "Failed to pause VM\n");
-        goto error_exit;
-    }
-    // clean event ring
-    if (VMI_FAILURE == vmi_events_listen(vmi, 0)) {
-        fprintf(stderr, "Failed to listen on VM events\n");
-        goto error_exit;
-    }
-
-    // disable singlestep on all vcpus
-    for (unsigned int vcpu=0; vcpu < num_vcpus; vcpu++) {
-        if (VMI_FAILURE == vmi_toggle_single_step_vcpu(vmi, &single_event, vcpu, false)) {
-            fprintf(stderr, "Failed to stop singlestepping on VCPU %d\n", vcpu);
-            goto error_exit;
-        }
-    }
-    printf("Singlestep stopped\n");
-    if (VMI_FAILURE == vmi_resume_vm(vmi)) {
-        fprintf(stderr, "Failed to resume VM\n");
-        goto error_exit;
-    }
-
-    // VM should be running
-    // sleep(5);
-
-    // toggle singlestep back ON
-    // pause before changing VM state
-    if (VMI_FAILURE == vmi_pause_vm(vmi)) {
-        fprintf(stderr, "Failed to pause VM\n");
-        goto error_exit;
-    }
-    printf("Restarting singlestep\n");
-    for (unsigned int vcpu=0; vcpu < num_vcpus; vcpu++) {
-        if (VMI_FAILURE == vmi_toggle_single_step_vcpu(vmi, &single_event, vcpu, true)) {
-            fprintf(stderr, "Failed to enable singlestep on VCPU %d\n", vcpu);
-            goto error_exit;
-        }
-    }
-    if (VMI_FAILURE == vmi_resume_vm(vmi)) {
-        fprintf(stderr, "Failed to resume VM\n");
-        goto error_exit;
-    }
-    // process a few more singlestep events
-    for (int i=0; i < 5; i++) {
-        printf("Waiting for events...\n");
-        if (VMI_FAILURE == vmi_events_listen(vmi,500)) {
-            fprintf(stderr, "Failed to listen on events\n");
-            goto error_exit;
-        }
-    }
     printf("Finished with test.\n");
 
     retcode = 0;
